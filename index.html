@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataClaw 架构总览</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #dbeafe 0%, #ede9fe 35%, #fce7f3 65%, #e0f2fe 100%);
+    color: #1e293b;
+  }
+
+  /* glass card */
+  .glass {
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.75);
+    border-radius: 16px;
+  }
+
+  /* HEADER */
+  .header {
+    padding: 48px 64px 36px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+  }
+  .header h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.5px; color: #1e293b; }
+  .header p { margin-top: 6px; color: #64748b; font-size: 14px; }
+  .stats { display: flex; gap: 40px; }
+  .stat { text-align: center; }
+  .stat-num { font-size: 30px; font-weight: 700; background: linear-gradient(135deg, #7c3aed, #2563eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .stat-label { font-size: 11px; color: #94a3b8; margin-top: 3px; letter-spacing: 0.5px; }
+
+  .main { padding: 0 64px 64px; display: flex; flex-direction: column; gap: 20px; }
+
+  .section-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; color: #94a3b8;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content:''; flex:1; height:1px; background: rgba(0,0,0,0.07); }
+
+  /* ── SKILL TREE ── */
+  .skill-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .sg {
+    background: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: 12px; padding: 16px;
+  }
+  .sg-header {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+    margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+  }
+  .skill-item { margin-bottom: 9px; }
+  .sname {
+    display: inline-block; border-radius: 5px;
+    padding: 2px 8px; font-size: 10.5px; font-weight: 600;
+    margin-bottom: 3px; letter-spacing: 0.2px;
+  }
+  .sdesc { font-size: 10px; color: #64748b; line-height: 1.45; }
+  .sn1 { background: #eff6ff; color: #2563eb; }
+  .sn2 { background: #ecfeff; color: #0891b2; }
+  .sn3 { background: #f0fdf4; color: #16a34a; }
+  .sn4 { background: #fff7ed; color: #ea580c; }
+  .sn5 { background: #f1f5f9; color: #64748b; }
+
+  .load-bar {
+    display: flex; align-items: center; margin-top: 18px;
+    background: rgba(0,0,0,0.03); border-radius: 10px;
+    padding: 12px 16px; gap: 0;
+  }
+  .lb-label { font-size: 10px; color: #94a3b8; white-space: nowrap; margin-right: 12px; }
+  .lb-step {
+    flex: 1; text-align: center; padding: 6px 4px;
+    border-radius: 7px; font-size: 10.5px;
+  }
+  .lb-step strong { display: block; color: #1e293b; font-size: 11px; }
+  .lb-step span { color: #94a3b8; font-size: 10px; }
+  .lb-arrow { color: #cbd5e1; padding: 0 6px; font-size: 12px; }
+  .lb-last { background: #eff6ff; border: 1px solid #bfdbfe; }
+
+  /* ── TWO COL ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  /* ── PERMISSIONS ── */
+  .perm-row {
+    display: flex; align-items: stretch; border-radius: 10px; overflow: hidden;
+    border: 1px solid #e2e8f0; margin-bottom: 10px;
+  }
+  .plabel {
+    width: 86px; padding: 12px 14px;
+    font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  }
+  .pcontent { flex: 1; padding: 12px 14px; font-size: 11.5px; color: #475569; background: #fff; }
+  .utag { display: inline-block; background: #f1f5f9; border-radius: 4px; padding: 1px 7px; font-size: 10px; color: #475569; margin: 1px 2px; }
+  .p-admin .plabel { background: #fefce8; color: #a16207; }
+  .p-user .plabel  { background: #f0fdf4; color: #15803d; }
+  .p-block .plabel { background: #fef2f2; color: #b91c1c; }
+
+  .deny-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .td { background: #fef2f2; border: 1px solid #fecaca; border-radius: 5px; padding: 3px 8px; font-size: 10.5px; color: #b91c1c; }
+  .ta { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 5px; padding: 3px 8px; font-size: 10.5px; color: #15803d; }
+
+  /* ── ROUTING ── */
+  .routing-wrap { display: grid; grid-template-columns: 1fr 28px 1fr; align-items: start; gap: 8px; }
+  .rc-label { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 7px; }
+  .r-list { display: flex; flex-direction: column; gap: 6px; }
+  .r-arrows { display: flex; flex-direction: column; padding-top: 22px; gap: 6px; align-items: center; }
+  .r-arr { color: #cbd5e1; font-size: 11px; line-height: 30px; }
+  .upill { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: 6px 11px; font-size: 11.5px; display: flex; align-items: center; gap: 7px; height: 30px; color: #334155; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dp { background: #60a5fa; } .dg { background: #a78bfa; } .dn { background: #cbd5e1; }
+  .apill { border-radius: 7px; padding: 6px 11px; font-size: 11.5px; font-weight: 500; display: flex; align-items: center; gap: 7px; height: 30px; }
+  .ap { background: #eff6ff; border: 1px solid #bfdbfe; color: #2563eb; }
+  .ag { background: #f5f3ff; border: 1px solid #ddd6fe; color: #7c3aed; }
+  .af { background: #f8fafc; border: 1px dashed #cbd5e1; color: #94a3b8; }
+  .auto-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 13px; font-size: 11px; color: #92400e; margin-top: 12px; }
+
+  /* ── CAN / CANNOT ── */
+  .qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .qa-col-title { font-size: 13px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 7px; }
+  .qa-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .qa-icon { font-size: 15px; margin-top: 7px; flex-shrink: 0; }
+  .qa-bubble { flex: 1; border-radius: 10px; padding: 10px 13px; font-size: 11.5px; line-height: 1.5; }
+  .qa-tag { display: inline-block; border-radius: 4px; padding: 1px 7px; font-size: 10px; font-weight: 600; margin-bottom: 4px; }
+  .t-can    { background: #dcfce7; color: #15803d; }
+  .t-cannot { background: #fee2e2; color: #b91c1c; }
+  .t-admin  { background: #fef9c3; color: #a16207; }
+  .b-can    { background: #f0fdf4; border: 1px solid #bbf7d0; color: #1e293b; }
+  .b-cannot { background: #fef2f2; border: 1px solid #fecaca; color: #1e293b; }
+  .qa-reason { font-size: 10.5px; color: #94a3b8; margin-top: 4px; }
+
+  /* ── ISOLATION ── */
+  .iso-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .iso-card { background: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.8); border-radius: 11px; padding: 16px; }
+  .iso-icon { font-size: 20px; margin-bottom: 8px; }
+  .iso-title { font-size: 12px; font-weight: 600; color: #1e293b; margin-bottom: 5px; }
+  .iso-desc { font-size: 10.5px; color: #64748b; line-height: 1.5; }
+  .iso-code { font-family: 'SF Mono', monospace; font-size: 9.5px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; padding: 5px 8px; color: #475569; margin-top: 8px; }
+
+  footer { text-align: center; padding: 32px; font-size: 11px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <h1>🦞 DataClaw 架构总览</h1>
+    <p>技能树 · 权限边界 · Agent 路由 · 会话隔离 · 用户能问什么</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-num">19</div><div class="stat-label">技能总数</div></div>
+    <div class="stat"><div class="stat-num">9</div><div class="stat-label">飞书 Agents</div></div>
+    <div class="stat"><div class="stat-num">3</div><div class="stat-label">权限等级</div></div>
+    <div class="stat"><div class="stat-num">6</div><div class="stat-label">隔离维度</div></div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- 1. SKILL TREE -->
+  <div class="glass" style="padding:24px 28px">
+    <div class="section-title">🌳 技能树</div>
+    <div class="skill-grid">
+
+      <div class="sg">
+        <div class="sg-header" style="color:#93c5fd">🔄 核心层</div>
+        <div class="skill-item"><div class="sname sn1">oc-core</div><div class="sdesc">基础工具库，workspace 路径管理、用户 hash 化</div></div>
+        <div class="skill-item"><div class="sname sn1">identity-guard</div><div class="sdesc">解析用户身份，判断 admin / user / blocked</div></div>
+        <div class="skill-item"><div class="sname sn1">memory-core</div><div class="sdesc">加载/写入用户历史记忆，支持「记住」「忘记」</div></div>
+        <div class="skill-item"><div class="sname sn1">user-workspace</div><div class="sdesc">单入口完成身份 + 记忆 + workspace 初始化</div></div>
+        <div class="skill-item"><div class="sname sn1">agent-manager</div><div class="sdesc">新用户自动 spawn 专属 agent，管理路由注册</div></div>
+        <div class="skill-item"><div class="sname sn1">model-switcher</div><div class="sdesc">Claude / GPT 系列切换，偏好持久化</div></div>
+      </div>
+
+      <div class="sg">
+        <div class="sg-header" style="color:#67e8f9">📱 飞书集成</div>
+        <div class="skill-item"><div class="sname sn2">feishu-doc</div><div class="sdesc">读写飞书文档，追加/插入/更新块内容</div></div>
+        <div class="skill-item"><div class="sname sn2">feishu-drive</div><div class="sdesc">云盘文件管理：列表、移动、删除</div></div>
+        <div class="skill-item"><div class="sname sn2">feishu-perm</div><div class="sdesc">文档权限管理，设置协作者、转让所有者</div></div>
+        <div class="skill-item"><div class="sname sn2">feishu-wiki</div><div class="sdesc">知识库读写，创建节点、移动文档</div></div>
+        <div style="margin-top:10px;font-size:10px;color:#fbbf24">⚠️ 使用前需用户先建好文档并授权编辑</div>
+      </div>
+
+      <div class="sg">
+        <div class="sg-header" style="color:#6ee7b7">🌍 共享工具</div>
+        <div class="skill-item"><div class="sname sn3">text-to-flowchart</div><div class="sdesc">文字描述 → 可视化流程图，部署 Netlify</div></div>
+        <div class="skill-item"><div class="sname sn3">daily-digest</div><div class="sdesc">汇总用户日志，生成日报，18:00 自动发送</div></div>
+        <div class="skill-item"><div class="sname sn3">weather</div><div class="sdesc">查询任意城市天气和预报，无需 API Key</div></div>
+        <div class="skill-item"><div class="sname sn3">tavily</div><div class="sdesc">AI 优化网页搜索，返回精准摘要</div></div>
+      </div>
+
+      <div class="sg">
+        <div class="sg-header" style="color:#fdba74">🛠️ GitHub</div>
+        <div class="skill-item"><div class="sname sn4">github</div><div class="sdesc">查看 PR / Issue / CI 状态，发表评论</div></div>
+        <div class="skill-item"><div class="sname sn4">gh-issues</div><div class="sdesc">批量处理 Issues，自动实现修复并开 PR</div></div>
+      </div>
+
+      <div class="sg">
+        <div class="sg-header" style="color:#94a3b8">⚙️ 运维 · admin only</div>
+        <div class="skill-item"><div class="sname sn5">healthcheck</div><div class="sdesc">服务器安全加固，检查防火墙/SSH 风险</div></div>
+        <div class="skill-item"><div class="sname sn5">tmux</div><div class="sdesc">远程控制 tmux 会话，发送按键/抓取输出</div></div>
+        <div class="skill-item"><div class="sname sn5">clawhub</div><div class="sdesc">技能市场：搜索/安装/更新/发布技能包</div></div>
+        <div class="skill-item"><div class="sname sn5">skill-creator</div><div class="sdesc">创建或更新 AgentSkill 技能包</div></div>
+      </div>
+
+    </div>
+    <div class="load-bar">
+      <div class="lb-label">自动加载顺序：</div>
+      <div class="lb-step"><strong>oc-core</strong><span>底层工具</span></div>
+      <div class="lb-arrow">→</div>
+      <div class="lb-step"><strong>identity-guard</strong><span>身份识别</span></div>
+      <div class="lb-arrow">→</div>
+      <div class="lb-step"><strong>memory-core</strong><span>记忆加载</span></div>
+      <div class="lb-arrow">→</div>
+      <div class="lb-step"><strong>user-workspace</strong><span>初始化</span></div>
+      <div class="lb-arrow">→</div>
+      <div class="lb-step lb-last"><strong>处理请求</strong><span>按需加载其他技能</span></div>
+    </div>
+  </div>
+
+  <!-- 2. ISOLATION -->
+  <div class="glass" style="padding:24px 28px">
+    <div class="section-title">🔒 隔离架构（6 个维度）</div>
+    <div class="iso-grid">
+      <div class="iso-card"><div class="iso-icon">💬</div><div class="iso-title">会话隔离</div><div class="iso-desc">每个 agent 独立 session 文件，历史互不可见</div><div class="iso-code">agents/{id}/sessions/*.jsonl</div></div>
+      <div class="iso-card"><div class="iso-icon">📁</div><div class="iso-title">Workspace 隔离</div><div class="iso-desc">独立 workspace 目录，配置文件完全分开</div><div class="iso-code">workspace-feishu-{id}/</div></div>
+      <div class="iso-card"><div class="iso-icon">🧠</div><div class="iso-title">记忆隔离</div><div class="iso-desc">按用户 hash 读写，禁止跨用户访问</div><div class="iso-code">spaces/user_{hash}/</div></div>
+      <div class="iso-card"><div class="iso-icon">🔑</div><div class="iso-title">权限隔离</div><div class="iso-desc">每条消息判断权限等级，blocked 立即拒绝</div><div class="iso-code">config/admins.json</div></div>
+      <div class="iso-card"><div class="iso-icon">🔧</div><div class="iso-title">工具隔离</div><div class="iso-desc">tools.deny 屏蔽 exec / browser 等危险工具</div><div class="iso-code">agents.list[].tools.deny</div></div>
+      <div class="iso-card"><div class="iso-icon">🛡️</div><div class="iso-title">数据隔离</div><div class="iso-desc">强制规则禁止跨用户访问，可疑行为写日志</div><div class="iso-code">config/security.log</div></div>
+    </div>
+  </div>
+
+  <!-- 3. PERM + ROUTING -->
+  <div class="two-col">
+    <div class="glass" style="padding:24px 28px">
+      <div class="section-title">🔑 权限等级</div>
+      <div class="perm-row p-admin"><div class="plabel">👑 admin</div><div class="pcontent">全部功能 · 运维技能 · exec 委托 · 系统配置<br><span class="utag">吉云飞</span></div></div>
+      <div class="perm-row p-user"> <div class="plabel">👤 user</div> <div class="pcontent">对话 · 共享技能 · 飞书文档 · 模型切换<br><span class="utag">王佳乐</span><span class="utag">朱桂业</span><span class="utag">郑志良</span><span class="utag">其他</span></div></div>
+      <div class="perm-row p-block"><div class="plabel">🚫 blocked</div><div class="pcontent">直接拒绝，不响应任何请求</div></div>
+      <div style="margin-top:4px">
+        <div style="font-size:10px;color:rgba(255,255,255,0.3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">飞书 Agent 工具限制</div>
+        <div class="deny-list">
+          <span class="td">🚫 exec</span><span class="td">🚫 browser</span><span class="td">🚫 canvas</span><span class="td">🚫 nodes</span><span class="td">🚫 tts</span>
+          <span class="ta">✅ feishu tools</span><span class="ta">✅ sessions_send</span><span class="ta">✅ web_search</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass" style="padding:24px 28px">
+      <div class="section-title">🔀 Agent 路由</div>
+      <div class="routing-wrap">
+        <div class="r-list">
+          <div class="rc-label">飞书用户</div>
+          <div class="upill"><span class="dot dp"></span>吉云飞</div>
+          <div class="upill"><span class="dot dp"></span>王佳乐</div>
+          <div class="upill"><span class="dot dp"></span>朱桂业</div>
+          <div class="upill"><span class="dot dp"></span>郑志良</div>
+          <div class="upill"><span class="dot dp"></span>未知用户 c265</div>
+          <div class="upill"><span class="dot dg"></span>群组 ecd2</div>
+          <div class="upill"><span class="dot dg"></span>群组 67ab</div>
+          <div class="upill"><span class="dot dn"></span>新用户 *</div>
+        </div>
+        <div class="r-arrows">
+          <div style="height:22px"></div>
+          <div class="r-arr">→</div><div class="r-arr">→</div><div class="r-arr">→</div><div class="r-arr">→</div>
+          <div class="r-arr">→</div><div class="r-arr">→</div><div class="r-arr">→</div><div class="r-arr">→</div>
+        </div>
+        <div class="r-list">
+          <div class="rc-label">专属 Agent</div>
+          <div class="apill ap">feishu-jyf</div>
+          <div class="apill ap">feishu-wjl</div>
+          <div class="apill ap">feishu-bdf0</div>
+          <div class="apill ap">feishu-2e83</div>
+          <div class="apill ap">feishu-c265</div>
+          <div class="apill ag">feishu-group-ecd2</div>
+          <div class="apill ag">feishu-group-67ab</div>
+          <div class="apill af">feishu-user（兜底）</div>
+        </div>
+      </div>
+      <div class="auto-note">⚡ 新用户 → feishu-user 通知主 Agent → 自动创建专属 agent + 绑定路由 + 重启 gateway</div>
+    </div>
+  </div>
+
+  <!-- 4. CAN / CANNOT -->
+  <div class="glass" style="padding:24px 28px">
+    <div class="section-title">💬 用户私聊示例</div>
+    <div class="qa-grid">
+      <div>
+        <div class="qa-col-title" style="color:#34d399">✅ 可以问</div>
+
+        <div class="qa-item">
+          <div class="qa-icon">💬</div>
+          <div class="qa-bubble b-can">
+            <span class="qa-tag t-can">通用对话</span>
+            <div>「帮我写一封邮件」「这段代码什么意思」「总结这篇文章」</div>
+            <div class="qa-reason">→ 普通 LLM 对话，无限制</div>
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-icon">🌊</div>
+          <div class="qa-bubble b-can">
+            <span class="qa-tag t-can">文生流程图</span>
+            <div>「文生流程图：画一个数据审批流程」「帮我生成一张系统架构图」</div>
+            <div class="qa-reason">→ text-to-flowchart，生成后返回链接</div>
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-icon">🌍</div>
+          <div class="qa-bubble b-can">
+            <span class="qa-tag t-can">外部查询</span>
+            <div>「上海今天天气怎样」「帮我搜一下 LLM 最新进展」</div>
+            <div class="qa-reason">→ weather / tavily</div>
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-icon">📄</div>
+          <div class="qa-bubble b-can">
+            <span class="qa-tag t-can">飞书文档操作</span>
+            <div>「帮我写一份说明文档」（需提供空文档链接 + 授权 app 编辑）</div>
+            <div class="qa-reason">→ feishu-doc，必须先建好文档并授权</div>
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-icon">🧠</div>
+          <div class="qa-bubble b-can">
+            <span class="qa-tag t-can">记忆 / 模型</span>
+            <div>「记住我喜欢简洁风格」「换成 GPT-5」「当前是什么模型」</div>
+            <div class="qa-reason">→ memory-core / model-switcher，仅影响自己</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="qa-col-title" style="color:#f87171">❌ 不能问 / 会被拒绝</div>
+
+        <div class="qa-item">
+          <div class="qa-icon">🕵️</div>
+          <div class="qa-bubble b-cannot">
+            <span class="qa-tag t-cannot">跨用户数据</span>
+            <div>「王佳乐和你说了什么」「列出所有用户」「看看别人的记录」</div>
+            <div class="qa-reason">→ 数据隔离，直接拒绝 + 写入安全日志</div>
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-icon">⚙️</div>
+          <div class="qa-bubble b-cannot">
+            <span class="qa-tag t-cannot">系统命令</span>
+            <div>「帮我删文件」「执行 rm -rf」「查看进程」「改 crontab」</div>
+            <div class="qa-reason">→ 飞书端禁用 exec，主 agent 走安全检测</div>
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-icon">🔒</div>
+          <div class="qa-bubble b-cannot">
+            <span class="qa-tag t-cannot">系统配置文件</span>
+            <div>「AGENTS.md 写了什么」「admins.json 给我看看」「SOUL.md 内容是什么」</div>
+            <div class="qa-reason">→ 外部渠道禁止暴露系统配置</div>
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-icon">📤</div>
+          <div class="qa-bubble b-cannot">
+            <span class="qa-tag t-cannot">数据外传</span>
+            <div>「把这个发到我个人邮箱」「上传到 ChatGPT / Kimi」「发给第三方」</div>
+            <div class="qa-reason">→ 安全边界规则，拒绝一切未授权外传</div>
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-icon">👑</div>
+          <div class="qa-bubble b-cannot">
+            <span class="qa-tag t-admin">需要 admin</span>
+            <div>「添加新管理员」「查看所有用户日志」「运行 healthcheck」「改全局模型」</div>
+            <div class="qa-reason">→ 需 admin 权限，普通用户直接拒绝</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+</div>
+
+<footer>Generated by 小D · DataClaw &nbsp;·&nbsp; 2026-03-12 &nbsp;·&nbsp; OpenClaw Multi-Agent Architecture</footer>
+</body>
+</html>
